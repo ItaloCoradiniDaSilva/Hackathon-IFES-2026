@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'cadastro_page.dart';
+import 'login_page.dart';
 
 void main() {
   runApp(const LocalShopApp());
@@ -108,7 +109,12 @@ class HomePage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () {
-              print('Entrar');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoginPage(),
+                ),
+              );
             },
             child: const Text(
               'Entrar',

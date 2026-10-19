@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+
 class CadastroPage extends StatefulWidget {
   const CadastroPage({super.key});
 
