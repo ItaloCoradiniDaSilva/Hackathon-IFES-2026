@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'cadastro_page.dart';
 
 void main() {
   runApp(const LocalShopApp());
@@ -125,7 +126,12 @@ class HomePage extends StatelessWidget {
                 backgroundColor: roxo,
               ),
               onPressed: () {
-                print('Cadastrar');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CadastroPage(),
+                  ),
+                );
               },
               child: const Text('Cadastrar'),
             ),
