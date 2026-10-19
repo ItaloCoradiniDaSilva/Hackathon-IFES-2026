@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'login_page.dart';
+
 
 class CadastroPage extends StatefulWidget {
   const CadastroPage({super.key});
@@ -439,7 +441,12 @@ class _CadastroPageState extends State<CadastroPage> {
                   const Text('Já possui uma conta?'),
                   TextButton(
                     onPressed: () {
-                      Navigator.pop(context);
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                      );
                     },
                     child: const Text(
                       'Entrar',
