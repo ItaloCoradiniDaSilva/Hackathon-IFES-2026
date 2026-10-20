@@ -7,33 +7,20 @@ class PerfilPage extends StatelessWidget {
 
   final void Function(Map<String, dynamic>) onNovaOferta;
   final void Function(Map<String, dynamic>) onNovaProcura;
+  final List<Map<String, String>> historicoCompras;
+  final bool carregandoHistorico;
+  final bool erroAoCarregarHistorico;
+  final VoidCallback onRecarregarHistorico;
 
   const PerfilPage({
     super.key,
     required this.onNovaOferta,
     required this.onNovaProcura,
+    required this.historicoCompras,
+    required this.carregandoHistorico,
+    required this.erroAoCarregarHistorico,
+    required this.onRecarregarHistorico,
   });
-
-  final List<Map<String, String>> historicoCompras = const [
-    {
-      'produto': 'Mouse Logitech',
-      'preco': 'R\$ 120,00',
-      'data': '10/10/2026',
-      'status': 'Concluída',
-    },
-    {
-      'produto': 'Teclado Mecânico',
-      'preco': 'R\$ 250,00',
-      'data': '02/10/2026',
-      'status': 'Concluída',
-    },
-    {
-      'produto': 'Headset Gamer',
-      'preco': 'R\$ 180,00',
-      'data': '25/09/2026',
-      'status': 'Concluída',
-    },
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -167,37 +154,51 @@ class PerfilPage extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          ...historicoCompras.map(
-            (compra) => Card(
-              color: Colors.white,
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: vinhoClaro,
-                  child: Icon(
-                    Icons.shopping_bag_outlined,
-                    color: vinho,
+          if (carregandoHistorico)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            )
+          else if (erroAoCarregarHistorico)
+            Column(
+              children: [
+                const Text('Não foi possível carregar o histórico de compras.'),
+                TextButton(
+                  onPressed: onRecarregarHistorico,
+                  child: const Text('Tentar novamente'),
+                ),
+              ],
+            )
+          else if (historicoCompras.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text('Você ainda não realizou nenhuma compra.'),
+            )
+          else
+            ...historicoCompras.map(
+              (compra) => Card(
+                color: Colors.white,
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: vinhoClaro,
+                    child: Icon(Icons.shopping_bag_outlined, color: vinho),
                   ),
-                ),
-                title: Text(
-                  compra['produto']!,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                  title: Text(
+                    compra['produto']!,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                ),
-                subtitle: Text(
-                  '${compra['data']} • ${compra['status']}',
-                ),
-                trailing: Text(
-                  compra['preco']!,
-                  style: const TextStyle(
-                    color: vinho,
-                    fontWeight: FontWeight.bold,
+                  subtitle: Text('${compra['data']} • ${compra['status']}'),
+                  trailing: Text(
+                    compra['preco']!,
+                    style: const TextStyle(
+                      color: vinho,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
           const SizedBox(height: 20),
         ],

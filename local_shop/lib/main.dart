@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
-import 'login_page.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'perfil_page.dart';
 
 void main() {
@@ -44,6 +46,131 @@ class _HomePageState extends State<HomePage> {
   String pesquisaProcura = '';
 
   final List<Map<String, dynamic>> carrinho = [];
+  final List<Map<String, String>> historicoCompras = [];
+
+  static const String chaveHistorico = 'local_shop.historico_compras.v1';
+  bool carregandoHistorico = true;
+  bool erroAoCarregarHistorico = false;
+  bool finalizandoCompra = false;
+
+  @override
+  void initState() {
+    super.initState();
+    carregarHistorico();
+  }
+
+  Future<void> carregarHistorico() async {
+    setState(() {
+      carregandoHistorico = true;
+      erroAoCarregarHistorico = false;
+    });
+
+    try {
+      final dados = await SharedPreferencesAsync().getString(chaveHistorico);
+      final compras = dados == null
+          ? <Map<String, String>>[]
+          : (jsonDecode(dados) as List<dynamic>)
+                .map((compra) => Map<String, String>.from(compra as Map))
+                .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        historicoCompras
+          ..clear()
+          ..addAll(compras);
+        carregandoHistorico = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        carregandoHistorico = false;
+        erroAoCarregarHistorico = true;
+      });
+    }
+  }
+
+  Future<void> finalizarCompra() async {
+    if (carrinho.isEmpty ||
+        finalizandoCompra ||
+        carregandoHistorico ||
+        erroAoCarregarHistorico) {
+      return;
+    }
+
+    setState(() {
+      finalizandoCompra = true;
+    });
+
+    final agora = DateTime.now();
+    final data =
+        '${agora.day.toString().padLeft(2, '0')}/'
+        '${agora.month.toString().padLeft(2, '0')}/${agora.year}';
+    final compras = carrinho.map((produto) {
+      final preco = produto['preco'] as double;
+      return <String, String>{
+        'produto': produto['nome'] as String,
+        'preco': 'R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}',
+        'data': data,
+        'status': 'Concluída',
+      };
+    }).toList();
+    final novoHistorico = [...compras, ...historicoCompras];
+
+    try {
+      // O carrinho só é esvaziado depois que o histórico é salvo.
+      await SharedPreferencesAsync().setString(
+        chaveHistorico,
+        jsonEncode(novoHistorico),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        historicoCompras
+          ..clear()
+          ..addAll(novoHistorico);
+        carrinho.clear();
+        finalizandoCompra = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('Compra finalizada com sucesso!'),
+            action: SnackBarAction(
+              label: 'Ver histórico',
+              onPressed: () {
+                selecionarPagina(3);
+              },
+            ),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        finalizandoCompra = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Não foi possível finalizar a compra. '
+              'Seus itens continuam no carrinho.',
+            ),
+            action: SnackBarAction(
+              label: 'Tentar novamente',
+              onPressed: finalizarCompra,
+            ),
+          ),
+        );
+    }
+  }
 
   final List<Map<String, dynamic>> produtos = [
     {
@@ -111,7 +238,16 @@ class _HomePageState extends State<HomePage> {
     },
   ];
 
+  void selecionarPagina(int index) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    setState(() {
+      paginaAtual = index;
+    });
+  }
+
   void adicionarCarrinho(Map<String, dynamic> produto) {
+    if (finalizandoCompra) return;
+
     setState(() {
       carrinho.add(produto);
     });
@@ -124,9 +260,7 @@ class _HomePageState extends State<HomePage> {
         action: SnackBarAction(
           label: 'Ver carrinho',
           onPressed: () {
-            setState(() {
-              paginaAtual = 2;
-            });
+            selecionarPagina(2);
           },
         ),
       ),
@@ -134,6 +268,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void removerCarrinho(int index) {
+    if (finalizandoCompra) return;
+
     setState(() {
       carrinho.removeAt(index);
     });
@@ -229,6 +365,10 @@ class _HomePageState extends State<HomePage> {
         paginaCarrinho(),
 
         PerfilPage(
+          historicoCompras: historicoCompras,
+          carregandoHistorico: carregandoHistorico,
+          erroAoCarregarHistorico: erroAoCarregarHistorico,
+          onRecarregarHistorico: carregarHistorico,
           onNovaOferta: (novaOferta) {
             setState(() {
               produtos.add(novaOferta);
@@ -269,9 +409,7 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             tooltip: 'Carrinho',
             onPressed: () {
-              setState(() {
-                paginaAtual = 2;
-              });
+              selecionarPagina(2);
             },
             icon: Stack(
               clipBehavior: Clip.none,
@@ -308,9 +446,7 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             tooltip: 'Perfil',
             onPressed: () {
-              setState(() {
-                paginaAtual = 3;
-              });
+              selecionarPagina(3);
             },
             icon: const Icon(
               Icons.person_outline,
@@ -330,11 +466,7 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: paginaAtual,
         indicatorColor: vinhoClaro,
-        onDestinationSelected: (index) {
-          setState(() {
-            paginaAtual = index;
-          });
-        },
+        onDestinationSelected: selecionarPagina,
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.sell_outlined),
@@ -584,9 +716,9 @@ class _HomePageState extends State<HomePage> {
                         backgroundColor: vinho,
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () {
-                        adicionarCarrinho(produto);
-                      },
+                      onPressed: finalizandoCompra
+                          ? null
+                          : () => adicionarCarrinho(produto),
                       icon: const Icon(
                         Icons.add_shopping_cart,
                         size: 18,
@@ -894,9 +1026,9 @@ class _HomePageState extends State<HomePage> {
                     'R\$ ${preco.toStringAsFixed(2).replaceAll('.', ',')}',
                   ),
                   trailing: IconButton(
-                    onPressed: () {
-                      removerCarrinho(index);
-                    },
+                    onPressed: finalizandoCompra
+                        ? null
+                        : () => removerCarrinho(index),
                     icon: const Icon(
                       Icons.delete_outline,
                       color: Colors.red,
@@ -953,18 +1085,20 @@ class _HomePageState extends State<HomePage> {
                     backgroundColor: vinho,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Finalização da compra ainda será implementada.',
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Continuar compra',
-                    style: TextStyle(
+                  onPressed: finalizandoCompra || carregandoHistorico
+                      ? null
+                      : erroAoCarregarHistorico
+                          ? carregarHistorico
+                          : finalizarCompra,
+                  child: Text(
+                    finalizandoCompra
+                        ? 'Finalizando compra...'
+                        : carregandoHistorico
+                            ? 'Carregando histórico...'
+                            : erroAoCarregarHistorico
+                                ? 'Recarregar histórico para finalizar'
+                                : 'Finalizar compra',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
