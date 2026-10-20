@@ -49,6 +49,9 @@ class _HomePageState extends State<HomePage> {
   final List<Map<String, String>> historicoCompras = [];
 
   static const String chaveHistorico = 'local_shop.historico_compras.v1';
+  static const String chaveCarrinho = 'local_shop.carrinho.v1';
+  static const String chaveProdutos = 'local_shop.produtos.v1';
+  static const String chaveProcuras = 'local_shop.procuras.v1';
   bool carregandoHistorico = true;
   bool erroAoCarregarHistorico = false;
   bool finalizandoCompra = false;
@@ -57,6 +60,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     carregarHistorico();
+    carregarDadosPersistidos();
   }
 
   Future<void> carregarHistorico() async {
@@ -88,6 +92,196 @@ class _HomePageState extends State<HomePage> {
         carregandoHistorico = false;
         erroAoCarregarHistorico = true;
       });
+    }
+  }
+
+
+  // ==========================================================
+  // PERSISTÊNCIA DE CARRINHO, OFERTAS E PROCURAS
+  // ==========================================================
+
+  String _nomeDoIcone(IconData icone) {
+    if (icone == Icons.laptop) return 'laptop';
+    if (icone == Icons.smartphone) return 'smartphone';
+    if (icone == Icons.chair_alt) return 'chair_alt';
+    if (icone == Icons.sports_esports) return 'sports_esports';
+    if (icone == Icons.memory) return 'memory';
+    if (icone == Icons.monitor) return 'monitor';
+    if (icone == Icons.shopping_bag) return 'shopping_bag';
+    if (icone == Icons.search) return 'search';
+    return 'shopping_bag';
+  }
+
+  IconData _iconePeloNome(String? nome, {required IconData padrao}) {
+    switch (nome) {
+      case 'laptop':
+        return Icons.laptop;
+      case 'smartphone':
+        return Icons.smartphone;
+      case 'chair_alt':
+        return Icons.chair_alt;
+      case 'sports_esports':
+        return Icons.sports_esports;
+      case 'memory':
+        return Icons.memory;
+      case 'monitor':
+        return Icons.monitor;
+      case 'shopping_bag':
+        return Icons.shopping_bag;
+      case 'search':
+        return Icons.search;
+      default:
+        return padrao;
+    }
+  }
+
+  Map<String, dynamic> _prepararItemParaSalvar(
+    Map<String, dynamic> item,
+  ) {
+    final copia = Map<String, dynamic>.from(item);
+    final icone = copia['icone'];
+
+    // IconData não pode ser convertido diretamente para JSON.
+    // Por isso, salvamos apenas um nome simples para o ícone.
+    if (icone is IconData) {
+      copia['icone'] = _nomeDoIcone(icone);
+    }
+
+    return copia;
+  }
+
+  Map<String, dynamic> _restaurarItemSalvo(
+    dynamic item, {
+    required IconData iconePadrao,
+  }) {
+    final mapa = Map<String, dynamic>.from(item as Map);
+
+    final nomeIcone = mapa['icone']?.toString();
+    mapa['icone'] = _iconePeloNome(
+      nomeIcone,
+      padrao: iconePadrao,
+    );
+
+    // Garante que o preço continue sendo double, pois a interface
+    // faz cast para double ao exibir ofertas e carrinho.
+    if (mapa['preco'] is num) {
+      mapa['preco'] = (mapa['preco'] as num).toDouble();
+    }
+
+    return mapa;
+  }
+
+  Future<void> carregarDadosPersistidos() async {
+    try {
+      final preferencias = SharedPreferencesAsync();
+
+      final dadosCarrinho = await preferencias.getString(chaveCarrinho);
+      final dadosProdutos = await preferencias.getString(chaveProdutos);
+      final dadosProcuras = await preferencias.getString(chaveProcuras);
+
+      final carrinhoSalvo = dadosCarrinho == null
+          ? null
+          : (jsonDecode(dadosCarrinho) as List<dynamic>)
+              .map(
+                (item) => _restaurarItemSalvo(
+                  item,
+                  iconePadrao: Icons.shopping_bag,
+                ),
+              )
+              .toList();
+
+      final produtosSalvos = dadosProdutos == null
+          ? null
+          : (jsonDecode(dadosProdutos) as List<dynamic>)
+              .map(
+                (item) => _restaurarItemSalvo(
+                  item,
+                  iconePadrao: Icons.shopping_bag,
+                ),
+              )
+              .toList();
+
+      final procurasSalvas = dadosProcuras == null
+          ? null
+          : (jsonDecode(dadosProcuras) as List<dynamic>)
+              .map(
+                (item) => _restaurarItemSalvo(
+                  item,
+                  iconePadrao: Icons.search,
+                ),
+              )
+              .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        if (carrinhoSalvo != null) {
+          carrinho
+            ..clear()
+            ..addAll(carrinhoSalvo);
+        }
+
+        // Se ainda não existir nada salvo, os produtos/procuras de exemplo
+        // que já existem no código continuam aparecendo normalmente.
+        if (produtosSalvos != null) {
+          produtos
+            ..clear()
+            ..addAll(produtosSalvos);
+        }
+
+        if (procurasSalvas != null) {
+          procuras
+            ..clear()
+            ..addAll(procurasSalvas);
+        }
+      });
+    } catch (erro) {
+      debugPrint('Erro ao carregar dados persistidos: $erro');
+    }
+  }
+
+  Future<void> salvarCarrinho() async {
+    try {
+      final dados = carrinho
+          .map(_prepararItemParaSalvar)
+          .toList();
+
+      await SharedPreferencesAsync().setString(
+        chaveCarrinho,
+        jsonEncode(dados),
+      );
+    } catch (erro) {
+      debugPrint('Erro ao salvar carrinho: $erro');
+    }
+  }
+
+  Future<void> salvarProdutos() async {
+    try {
+      final dados = produtos
+          .map(_prepararItemParaSalvar)
+          .toList();
+
+      await SharedPreferencesAsync().setString(
+        chaveProdutos,
+        jsonEncode(dados),
+      );
+    } catch (erro) {
+      debugPrint('Erro ao salvar ofertas: $erro');
+    }
+  }
+
+  Future<void> salvarProcuras() async {
+    try {
+      final dados = procuras
+          .map(_prepararItemParaSalvar)
+          .toList();
+
+      await SharedPreferencesAsync().setString(
+        chaveProcuras,
+        jsonEncode(dados),
+      );
+    } catch (erro) {
+      debugPrint('Erro ao salvar procuras: $erro');
     }
   }
 
@@ -123,6 +317,13 @@ class _HomePageState extends State<HomePage> {
       await SharedPreferencesAsync().setString(
         chaveHistorico,
         jsonEncode(novoHistorico),
+      );
+
+      // A compra foi concluída: o carrinho persistido também precisa
+      // ser esvaziado para não voltar quando o aplicativo abrir novamente.
+      await SharedPreferencesAsync().setString(
+        chaveCarrinho,
+        jsonEncode(<dynamic>[]),
       );
 
       if (!mounted) return;
@@ -245,12 +446,16 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void adicionarCarrinho(Map<String, dynamic> produto) {
+  Future<void> adicionarCarrinho(Map<String, dynamic> produto) async {
     if (finalizandoCompra) return;
 
     setState(() {
       carrinho.add(produto);
     });
+
+    await salvarCarrinho();
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -267,12 +472,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void removerCarrinho(int index) {
+  Future<void> removerCarrinho(int index) async {
     if (finalizandoCompra) return;
 
     setState(() {
       carrinho.removeAt(index);
     });
+
+    await salvarCarrinho();
   }
 
   Future<void> fazerOferta(Map<String, dynamic> procura) async {
@@ -334,12 +541,18 @@ class _HomePageState extends State<HomePage> {
             setState(() {
               produtos.add(novaOferta);
             });
+
+            // Salva a lista completa de ofertas depois de adicionar a nova.
+            salvarProdutos();
           },
 
           onNovaProcura: (novaProcura) {
             setState(() {
               procuras.add(novaProcura);
             });
+
+            // Salva a lista completa de procuras depois de adicionar a nova.
+            salvarProcuras();
           },
         ),
       ];
