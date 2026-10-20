@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'login_page.dart';
+import 'perfil_page.dart';
 
 void main() {
   runApp(const LocalShopApp());
@@ -223,10 +224,24 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final paginas = [
-      paginaOfertas(),
-      paginaProcura(),
-      paginaCarrinho(),
-    ];
+        paginaOfertas(),
+        paginaProcura(),
+        paginaCarrinho(),
+
+        PerfilPage(
+          onNovaOferta: (novaOferta) {
+            setState(() {
+              produtos.add(novaOferta);
+            });
+          },
+
+          onNovaProcura: (novaProcura) {
+            setState(() {
+              procuras.add(novaProcura);
+            });
+          },
+        ),
+      ];
 
     return Scaffold(
       appBar: AppBar(
@@ -291,14 +306,11 @@ class _HomePageState extends State<HomePage> {
           ),
 
           IconButton(
-            tooltip: 'Entrar',
+            tooltip: 'Perfil',
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LoginPage(),
-                ),
-              );
+              setState(() {
+                paginaAtual = 3;
+              });
             },
             icon: const Icon(
               Icons.person_outline,
@@ -363,6 +375,16 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             label: 'Carrinho',
+          ),
+          const NavigationDestination(
+            icon: Icon(
+              Icons.person_outline,
+            ),
+            selectedIcon: Icon(
+              Icons.person,
+              color: vinho,
+            ),
+            label: 'Perfil',
           ),
         ],
       ),
