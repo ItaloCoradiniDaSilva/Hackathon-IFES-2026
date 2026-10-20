@@ -276,85 +276,46 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fazerOferta(Map<String, dynamic> procura) async {
-    final precoController = TextEditingController();
-    final mensagemController = TextEditingController();
-
-    await showDialog(
+    final resultado = await showDialog<_ResultadoOferta>(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: Text(
-            'Oferta para ${procura['produto']}',
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${procura['usuario']} está procurando este produto.',
-                ),
-
-                const SizedBox(height: 20),
-
-                TextField(
-                  controller: precoController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Valor da sua oferta',
-                    prefixText: 'R\$ ',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-
-                const SizedBox(height: 15),
-
-                TextField(
-                  controller: mensagemController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Mensagem',
-                    hintText: 'Ex: Tenho esse produto em ótimo estado.',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: vinho,
-              ),
-              onPressed: () {
-                if (precoController.text.trim().isEmpty) {
-                  return;
-                }
-
-                Navigator.pop(context);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Oferta enviada para ${procura['usuario']}!',
-                    ),
-                  ),
-                );
-              },
-              child: const Text('Enviar oferta'),
-            ),
-          ],
+        return _DialogFazerOferta(
+          produto: procura['produto'].toString(),
+          usuario: procura['usuario'].toString(),
         );
       },
     );
 
-    precoController.dispose();
-    mensagemController.dispose();
+    if (resultado == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final valorFormatado =
+        resultado.valor.toStringAsFixed(2).replaceAll('.', ',');
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Oferta de R\$ $valorFormatado enviada para '
+            '${procura['usuario']}!',
+          ),
+        ),
+      );
+
+    debugPrint('========================');
+    debugPrint('OFERTA ENVIADA');
+    debugPrint('Produto: ${procura['produto']}');
+    debugPrint('Usuário: ${procura['usuario']}');
+    debugPrint('Valor: R\$ $valorFormatado');
+    debugPrint('Mensagem: ${resultado.mensagem}');
+    debugPrint('========================');
   }
 
   @override
@@ -1111,3 +1072,150 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
+class _ResultadoOferta {
+  final double valor;
+  final String mensagem;
+
+  const _ResultadoOferta({
+    required this.valor,
+    required this.mensagem,
+  });
+}
+
+class _DialogFazerOferta extends StatefulWidget {
+  final String produto;
+  final String usuario;
+
+  const _DialogFazerOferta({
+    required this.produto,
+    required this.usuario,
+  });
+
+  @override
+  State<_DialogFazerOferta> createState() => _DialogFazerOfertaState();
+}
+
+class _DialogFazerOfertaState extends State<_DialogFazerOferta> {
+  static const Color vinho = Color(0xFF7A1F2B);
+
+  final _formKey = GlobalKey<FormState>();
+  final precoController = TextEditingController();
+  final mensagemController = TextEditingController();
+
+  @override
+  void dispose() {
+    precoController.dispose();
+    mensagemController.dispose();
+    super.dispose();
+  }
+
+  double? converterValor(String texto) {
+    final valor = texto.trim().replaceAll(',', '.');
+
+    if (valor.isEmpty) {
+      return null;
+    }
+
+    return double.tryParse(valor);
+  }
+
+  void enviarOferta() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final valor = converterValor(precoController.text);
+
+    if (valor == null) {
+      return;
+    }
+
+    final resultado = _ResultadoOferta(
+      valor: valor,
+      mensagem: mensagemController.text.trim(),
+    );
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.of(context).pop(resultado);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        'Oferta para ${widget.produto}',
+      ),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${widget.usuario} está procurando este produto.',
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: precoController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Valor da sua oferta',
+                  prefixText: 'R\$ ',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (valor) {
+                  if (valor == null || valor.trim().isEmpty) {
+                    return 'Informe o valor da oferta.';
+                  }
+
+                  final numero = converterValor(valor);
+
+                  if (numero == null) {
+                    return 'Informe um valor válido.';
+                  }
+
+                  if (numero <= 0) {
+                    return 'O valor deve ser maior que zero.';
+                  }
+
+                  return null;
+                },
+              ),
+              const SizedBox(height: 15),
+              TextFormField(
+                controller: mensagemController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Mensagem',
+                  hintText: 'Ex: Tenho esse produto em ótimo estado.',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            FocusManager.instance.primaryFocus?.unfocus();
+            Navigator.of(context).pop();
+          },
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: vinho,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: enviarOferta,
+          child: const Text('Enviar oferta'),
+        ),
+      ],
+    );
+  }
+}
+
